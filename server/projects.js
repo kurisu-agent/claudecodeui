@@ -406,7 +406,8 @@ async function getProjects(progressCallback = null) {
 
     totalProjects = directories.length + manualProjectsCount;
 
-    for (const entry of directories) {
+    // Load all projects in parallel for faster boot
+    const projectPromises = directories.map(async (entry) => {
         processedProjects++;
 
         // Emit progress
@@ -419,16 +420,14 @@ async function getProjects(progressCallback = null) {
           });
         }
 
-        const projectPath = path.join(claudeDir, entry.name);
-        
         // Extract actual project directory from JSONL sessions
         const actualProjectDir = await extractProjectDirectory(entry.name);
-        
+
         // Get display name from config or generate one
         const customName = config[entry.name]?.displayName;
         const autoDisplayName = await generateDisplayName(entry.name, actualProjectDir);
         const fullPath = actualProjectDir;
-        
+
         const project = {
           name: entry.name,
           path: actualProjectDir,
@@ -437,46 +436,48 @@ async function getProjects(progressCallback = null) {
           isCustomName: !!customName,
           sessions: []
         };
-        
-        // Try to get sessions for this project (just first 5 for performance)
-        try {
-          const sessionResult = await getSessions(entry.name, 5, 0);
-          project.sessions = sessionResult.sessions || [];
+
+        // Fetch sessions, cursor sessions, codex sessions, and TaskMaster in parallel
+        const [sessionResult, cursorSessions, codexSessions, taskMasterResult] = await Promise.allSettled([
+          getSessions(entry.name, 5, 0),
+          getCursorSessions(actualProjectDir),
+          getCodexSessions(actualProjectDir),
+          detectTaskMasterFolder(actualProjectDir)
+        ]);
+
+        // Apply session results
+        if (sessionResult.status === 'fulfilled') {
+          project.sessions = sessionResult.value.sessions || [];
           project.sessionMeta = {
-            hasMore: sessionResult.hasMore,
-            total: sessionResult.total
+            hasMore: sessionResult.value.hasMore,
+            total: sessionResult.value.total
           };
-        } catch (e) {
-          console.warn(`Could not load sessions for project ${entry.name}:`, e.message);
-        }
-        
-        // Also fetch Cursor sessions for this project
-        try {
-          project.cursorSessions = await getCursorSessions(actualProjectDir);
-        } catch (e) {
-          console.warn(`Could not load Cursor sessions for project ${entry.name}:`, e.message);
-          project.cursorSessions = [];
+        } else {
+          console.warn(`Could not load sessions for project ${entry.name}:`, sessionResult.reason?.message);
         }
 
-        // Also fetch Codex sessions for this project
-        try {
-          project.codexSessions = await getCodexSessions(actualProjectDir);
-        } catch (e) {
-          console.warn(`Could not load Codex sessions for project ${entry.name}:`, e.message);
-          project.codexSessions = [];
+        // Apply Cursor sessions
+        project.cursorSessions = cursorSessions.status === 'fulfilled' ? cursorSessions.value : [];
+        if (cursorSessions.status === 'rejected') {
+          console.warn(`Could not load Cursor sessions for project ${entry.name}:`, cursorSessions.reason?.message);
         }
 
-        // Add TaskMaster detection
-        try {
-          const taskMasterResult = await detectTaskMasterFolder(actualProjectDir);
+        // Apply Codex sessions
+        project.codexSessions = codexSessions.status === 'fulfilled' ? codexSessions.value : [];
+        if (codexSessions.status === 'rejected') {
+          console.warn(`Could not load Codex sessions for project ${entry.name}:`, codexSessions.reason?.message);
+        }
+
+        // Apply TaskMaster detection
+        if (taskMasterResult.status === 'fulfilled') {
           project.taskmaster = {
-            hasTaskmaster: taskMasterResult.hasTaskmaster,
-            hasEssentialFiles: taskMasterResult.hasEssentialFiles,
-            metadata: taskMasterResult.metadata,
-            status: taskMasterResult.hasTaskmaster && taskMasterResult.hasEssentialFiles ? 'configured' : 'not-configured'
+            hasTaskmaster: taskMasterResult.value.hasTaskmaster,
+            hasEssentialFiles: taskMasterResult.value.hasEssentialFiles,
+            metadata: taskMasterResult.value.metadata,
+            status: taskMasterResult.value.hasTaskmaster && taskMasterResult.value.hasEssentialFiles ? 'configured' : 'not-configured'
           };
-        } catch (e) {
-          console.warn(`Could not detect TaskMaster for project ${entry.name}:`, e.message);
+        } else {
+          console.warn(`Could not detect TaskMaster for project ${entry.name}:`, taskMasterResult.reason?.message);
           project.taskmaster = {
             hasTaskmaster: false,
             hasEssentialFiles: false,
@@ -485,8 +486,10 @@ async function getProjects(progressCallback = null) {
           };
         }
 
-      projects.push(project);
-    }
+      return project;
+    });
+
+    projects.push(...await Promise.all(projectPromises));
   } catch (error) {
     // If the directory doesn't exist (ENOENT), that's okay - just continue with empty projects
     if (error.code !== 'ENOENT') {
@@ -498,9 +501,11 @@ async function getProjects(progressCallback = null) {
       .length;
   }
   
-  // Add manually configured projects that don't exist as folders yet
-  for (const [projectName, projectConfig] of Object.entries(config)) {
-    if (!existingProjects.has(projectName) && projectConfig.manuallyAdded) {
+  // Add manually configured projects that don't exist as folders yet (in parallel)
+  const manualEntries = Object.entries(config)
+    .filter(([name, cfg]) => !existingProjects.has(name) && cfg.manuallyAdded);
+
+  const manualPromises = manualEntries.map(async ([projectName, projectConfig]) => {
       processedProjects++;
 
       // Emit progress for manual projects
@@ -515,71 +520,72 @@ async function getProjects(progressCallback = null) {
 
       // Use the original path if available, otherwise extract from potential sessions
       let actualProjectDir = projectConfig.originalPath;
-      
+
       if (!actualProjectDir) {
         try {
           actualProjectDir = await extractProjectDirectory(projectName);
         } catch (error) {
-          // Fall back to decoded project name
           actualProjectDir = projectName.replace(/-/g, '/');
         }
       }
-      
-              const project = {
-          name: projectName,
-          path: actualProjectDir,
-          displayName: projectConfig.displayName || await generateDisplayName(projectName, actualProjectDir),
-          fullPath: actualProjectDir,
-          isCustomName: !!projectConfig.displayName,
-          isManuallyAdded: true,
-          sessions: [],
-          cursorSessions: [],
-          codexSessions: []
-        };
 
-      // Try to fetch Cursor sessions for manual projects too
-      try {
-        project.cursorSessions = await getCursorSessions(actualProjectDir);
-      } catch (e) {
-        console.warn(`Could not load Cursor sessions for manual project ${projectName}:`, e.message);
+      const project = {
+        name: projectName,
+        path: actualProjectDir,
+        displayName: projectConfig.displayName || await generateDisplayName(projectName, actualProjectDir),
+        fullPath: actualProjectDir,
+        isCustomName: !!projectConfig.displayName,
+        isManuallyAdded: true,
+        sessions: [],
+        cursorSessions: [],
+        codexSessions: []
+      };
+
+      // Fetch Cursor sessions, Codex sessions, and TaskMaster in parallel
+      const [cursorSessions, codexSessions, taskMasterResult] = await Promise.allSettled([
+        getCursorSessions(actualProjectDir),
+        getCodexSessions(actualProjectDir),
+        detectTaskMasterFolder(actualProjectDir)
+      ]);
+
+      // Apply Cursor sessions
+      project.cursorSessions = cursorSessions.status === 'fulfilled' ? cursorSessions.value : [];
+      if (cursorSessions.status === 'rejected') {
+        console.warn(`Could not load Cursor sessions for manual project ${projectName}:`, cursorSessions.reason?.message);
       }
 
-      // Try to fetch Codex sessions for manual projects too
-      try {
-        project.codexSessions = await getCodexSessions(actualProjectDir);
-      } catch (e) {
-        console.warn(`Could not load Codex sessions for manual project ${projectName}:`, e.message);
+      // Apply Codex sessions
+      project.codexSessions = codexSessions.status === 'fulfilled' ? codexSessions.value : [];
+      if (codexSessions.status === 'rejected') {
+        console.warn(`Could not load Codex sessions for manual project ${projectName}:`, codexSessions.reason?.message);
       }
 
-      // Add TaskMaster detection for manual projects
-      try {
-        const taskMasterResult = await detectTaskMasterFolder(actualProjectDir);
-        
-        // Determine TaskMaster status
+      // Apply TaskMaster detection
+      if (taskMasterResult.status === 'fulfilled') {
         let taskMasterStatus = 'not-configured';
-        if (taskMasterResult.hasTaskmaster && taskMasterResult.hasEssentialFiles) {
-          taskMasterStatus = 'taskmaster-only'; // We don't check MCP for manual projects in bulk
+        if (taskMasterResult.value.hasTaskmaster && taskMasterResult.value.hasEssentialFiles) {
+          taskMasterStatus = 'taskmaster-only';
         }
-        
         project.taskmaster = {
           status: taskMasterStatus,
-          hasTaskmaster: taskMasterResult.hasTaskmaster,
-          hasEssentialFiles: taskMasterResult.hasEssentialFiles,
-          metadata: taskMasterResult.metadata
+          hasTaskmaster: taskMasterResult.value.hasTaskmaster,
+          hasEssentialFiles: taskMasterResult.value.hasEssentialFiles,
+          metadata: taskMasterResult.value.metadata
         };
-      } catch (error) {
-        console.warn(`TaskMaster detection failed for manual project ${projectName}:`, error.message);
+      } else {
+        console.warn(`TaskMaster detection failed for manual project ${projectName}:`, taskMasterResult.reason?.message);
         project.taskmaster = {
           status: 'error',
           hasTaskmaster: false,
           hasEssentialFiles: false,
-          error: error.message
+          error: taskMasterResult.reason?.message
         };
       }
-      
-      projects.push(project);
-    }
-  }
+
+      return project;
+  });
+
+  projects.push(...await Promise.all(manualPromises));
 
   // Emit completion after all projects (including manual) are processed
   if (progressCallback) {
