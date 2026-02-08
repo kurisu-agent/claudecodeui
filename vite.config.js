@@ -6,22 +6,36 @@ export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   
   
+  const serverConfig = {
+    port: parseInt(env.VITE_PORT) || 5173,
+    proxy: {
+      '/api': `http://localhost:${env.PORT || 3001}`,
+      '/ws': {
+        target: `ws://localhost:${env.PORT || 3001}`,
+        ws: true
+      },
+      '/shell': {
+        target: `ws://localhost:${env.PORT || 3001}`,
+        ws: true
+      }
+    }
+  }
+
+  if (env.VITE_ALLOWED_HOST) {
+    serverConfig.allowedHosts = [env.VITE_ALLOWED_HOST]
+  }
+
+  if (env.VITE_HMR_HOST) {
+    serverConfig.hmr = {
+      host: env.VITE_HMR_HOST,
+      protocol: env.VITE_HMR_PROTOCOL || 'wss',
+      clientPort: parseInt(env.VITE_HMR_CLIENT_PORT) || 443
+    }
+  }
+
   return {
     plugins: [react()],
-    server: {
-      port: parseInt(env.VITE_PORT) || 5173,
-      proxy: {
-        '/api': `http://localhost:${env.PORT || 3001}`,
-        '/ws': {
-          target: `ws://localhost:${env.PORT || 3001}`,
-          ws: true
-        },
-        '/shell': {
-          target: `ws://localhost:${env.PORT || 3001}`,
-          ws: true
-        }
-      }
-    },
+    server: serverConfig,
     build: {
       outDir: 'dist',
       chunkSizeWarningLimit: 1000,
