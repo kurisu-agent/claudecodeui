@@ -49,6 +49,8 @@ function ClaudePermissions({
   setNewAllowedTool,
   newDisallowedTool,
   setNewDisallowedTool,
+  defaultPermissionMode,
+  setDefaultPermissionMode,
 }) {
   const { t } = useTranslation('settings');
   const addAllowedTool = (tool) => {
@@ -73,8 +75,58 @@ function ClaudePermissions({
     setDisallowedTools(disallowedTools.filter(t => t !== tool));
   };
 
+  const modeOptions = [
+    { value: 'default', label: 'Default', description: 'Ask for permission before each action', color: 'gray' },
+    { value: 'acceptEdits', label: 'Accept Edits', description: 'Auto-accept file edits, ask for other actions', color: 'green' },
+    { value: 'bypassPermissions', label: 'Bypass Permissions', description: 'Skip all permission prompts (YOLO mode)', color: 'orange' },
+    { value: 'plan', label: 'Plan', description: 'Only plan actions, never execute', color: 'blue' },
+  ];
+
   return (
     <div className="space-y-6">
+      {/* Default Permission Mode */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Shield className="w-5 h-5 text-blue-500" />
+          <h3 className="text-lg font-medium text-foreground">
+            Default Permission Mode
+          </h3>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          New sessions will start in this mode. You can still change the mode per-session.
+        </p>
+
+        {modeOptions.map(({ value, label, description, color }) => (
+          <div
+            key={value}
+            className={`border rounded-lg p-4 cursor-pointer transition-all ${
+              defaultPermissionMode === value
+                ? `bg-${color}-50 dark:bg-${color}-900/20 border-${color}-400 dark:border-${color}-600`
+                : 'bg-gray-50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+            }`}
+            onClick={() => setDefaultPermissionMode(value)}
+          >
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="defaultPermissionMode"
+                checked={defaultPermissionMode === value}
+                onChange={() => setDefaultPermissionMode(value)}
+                className={`mt-1 w-4 h-4 text-${color}-600`}
+              />
+              <div>
+                <div className={`font-medium ${defaultPermissionMode === value ? `text-${color}-900 dark:text-${color}-100` : 'text-foreground'}`}>
+                  {label}
+                </div>
+                <div className={`text-sm ${defaultPermissionMode === value ? `text-${color}-700 dark:text-${color}-300` : 'text-muted-foreground'}`}>
+                  {description}
+                </div>
+              </div>
+            </label>
+          </div>
+        ))}
+      </div>
+
       {/* Skip Permissions */}
       <div className="space-y-4">
         <div className="flex items-center gap-3">

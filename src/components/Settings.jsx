@@ -89,6 +89,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
   // Codex-specific states
   const [codexMcpServers, setCodexMcpServers] = useState([]);
   const [codexPermissionMode, setCodexPermissionMode] = useState('default');
+  const [defaultPermissionMode, setDefaultPermissionMode] = useState('default');
   const [showCodexMcpForm, setShowCodexMcpForm] = useState(false);
   const [codexMcpFormData, setCodexMcpFormData] = useState({
     name: '',
@@ -542,12 +543,14 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
         setDisallowedTools(settings.disallowedTools || []);
         setSkipPermissions(settings.skipPermissions || false);
         setProjectSortOrder(settings.projectSortOrder || 'name');
+        setDefaultPermissionMode(settings.defaultPermissionMode || 'default');
       } else {
         // Set defaults
         setAllowedTools([]);
         setDisallowedTools([]);
         setSkipPermissions(false);
         setProjectSortOrder('name');
+        setDefaultPermissionMode('default');
       }
       
       // Load Cursor settings from localStorage
@@ -728,6 +731,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
         disallowedTools,
         skipPermissions,
         projectSortOrder,
+        defaultPermissionMode,
         lastUpdated: new Date().toISOString()
       };
       
@@ -1379,6 +1383,8 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                         setNewAllowedTool={setNewAllowedTool}
                         newDisallowedTool={newDisallowedTool}
                         setNewDisallowedTool={setNewDisallowedTool}
+                        defaultPermissionMode={defaultPermissionMode}
+                        setDefaultPermissionMode={setDefaultPermissionMode}
                       />
                     )}
 
