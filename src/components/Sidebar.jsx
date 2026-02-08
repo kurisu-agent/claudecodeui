@@ -6,13 +6,14 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { useTranslation } from 'react-i18next';
 
-import { FolderOpen, Folder, Plus, MessageSquare, Clock, ChevronDown, ChevronRight, Edit3, Check, X, Trash2, Settings, FolderPlus, RefreshCw, Sparkles, Edit2, Star, Search, AlertTriangle } from 'lucide-react';
+import { FolderOpen, Folder, Plus, MessageSquare, Clock, ChevronDown, ChevronRight, Edit3, Check, X, Trash2, Settings, FolderPlus, RefreshCw, Sparkles, Edit2, Star, Search, AlertTriangle, Archive } from 'lucide-react';
 import { cn } from '../lib/utils';
 import ClaudeLogo from './ClaudeLogo';
 import CursorLogo from './CursorLogo.jsx';
 import CodexLogo from './CodexLogo.jsx';
 import TaskIndicator from './TaskIndicator';
 import ProjectCreationWizard from './ProjectCreationWizard';
+import ArchiveModal from './ArchiveModal';
 import { api } from '../utils/api';
 import { useTaskMaster } from '../contexts/TaskMasterContext';
 import { useTasksSettings } from '../contexts/TasksSettingsContext';
@@ -100,6 +101,19 @@ function Sidebar({
       return new Set();
     }
   });
+
+  // Archived projects state - persisted in localStorage
+  const [archivedProjects, setArchivedProjects] = useState(() => {
+    try {
+      const saved = localStorage.getItem('archivedProjects');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch (error) {
+      console.error('Error loading archived projects:', error);
+      return new Set();
+    }
+  });
+
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
 
   // Touch handler to prevent double-tap issues on iPad (only for buttons, not scroll areas)
   const handleTouchClick = (callback) => {
@@ -224,6 +238,55 @@ function Sidebar({
 
   const isProjectStarred = (projectName) => {
     return starredProjects.has(projectName);
+  };
+
+  // Archived projects utility functions
+  const toggleArchiveProject = (projectName) => {
+    const newArchived = new Set(archivedProjects);
+    if (newArchived.has(projectName)) {
+      newArchived.delete(projectName);
+    } else {
+      newArchived.add(projectName);
+    }
+    setArchivedProjects(newArchived);
+
+    try {
+      localStorage.setItem('archivedProjects', JSON.stringify([...newArchived]));
+    } catch (error) {
+      console.error('Error saving archived projects:', error);
+    }
+  };
+
+  const isProjectArchived = (projectName) => {
+    return archivedProjects.has(projectName);
+  };
+
+  const handleArchiveDelete = async (project) => {
+    try {
+      const sessionCount = getAllSessions(project).length;
+      const response = await api.deleteProject(project.name, sessionCount > 0);
+      if (response.ok) {
+        // Remove from archived set
+        const newArchived = new Set(archivedProjects);
+        newArchived.delete(project.name);
+        setArchivedProjects(newArchived);
+        try {
+          localStorage.setItem('archivedProjects', JSON.stringify([...newArchived]));
+        } catch (error) {
+          console.error('Error saving archived projects:', error);
+        }
+        if (onProjectDelete) {
+          onProjectDelete(project.name);
+        }
+      } else {
+        const error = await response.json();
+        console.error('Failed to delete project');
+        alert(error.error || t('messages.deleteProjectFailed'));
+      }
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      alert(t('messages.deleteProjectError'));
+    }
   };
 
   // Helper function to get all sessions for a project (initial + additional)
@@ -472,14 +535,17 @@ function Sidebar({
     }
   };
 
-  // Filter projects based on search input
+  // Filter projects based on search input and archive status
   const filteredProjects = sortedProjects.filter(project => {
+    // Hide archived projects from main list
+    if (isProjectArchived(project.name)) return false;
+
     if (!searchFilter.trim()) return true;
-    
+
     const searchLower = searchFilter.toLowerCase();
     const displayName = (project.displayName || project.name).toLowerCase();
     const projectName = project.name.toLowerCase();
-    
+
     // Search in both display name and actual project name/path
     return displayName.includes(searchLower) || projectName.includes(searchLower);
   });
@@ -509,6 +575,17 @@ function Sidebar({
           }}
         />,
         document.body
+      )}
+
+      {/* Archive Modal */}
+      {showArchiveModal && (
+        <ArchiveModal
+          projects={projects}
+          archivedProjects={archivedProjects}
+          onRestore={(projectName) => toggleArchiveProject(projectName)}
+          onDelete={(project) => handleArchiveDelete(project)}
+          onClose={() => setShowArchiveModal(false)}
+        />
       )}
 
       {/* Delete Confirmation Modal */}
@@ -978,16 +1055,6 @@ function Sidebar({
                                   )} />
                                 </button>
                                 <button
-                                    className="w-8 h-8 rounded-lg bg-red-500/10 dark:bg-red-900/30 flex items-center justify-center active:scale-90 border border-red-200 dark:border-red-800"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      deleteProject(project);
-                                    }}
-                                    onTouchEnd={handleTouchClick(() => deleteProject(project))}
-                                  >
-                                    <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
-                                  </button>
-                                <button
                                   className="w-8 h-8 rounded-lg bg-primary/10 dark:bg-primary/20 flex items-center justify-center active:scale-90 border border-primary/20 dark:border-primary/30"
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -997,6 +1064,27 @@ function Sidebar({
                                 >
                                   <Edit3 className="w-4 h-4 text-primary" />
                                 </button>
+                                <button
+                                  className="w-8 h-8 rounded-lg bg-gray-500/10 dark:bg-gray-900/30 flex items-center justify-center active:scale-90 border border-gray-200 dark:border-gray-800"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleArchiveProject(project.name);
+                                  }}
+                                  onTouchEnd={handleTouchClick(() => toggleArchiveProject(project.name))}
+                                  title={t('tooltips.archiveProject')}
+                                >
+                                  <Archive className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                                </button>
+                                <button
+                                    className="w-8 h-8 rounded-lg bg-red-500/10 dark:bg-red-900/30 flex items-center justify-center active:scale-90 border border-red-200 dark:border-red-800"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deleteProject(project);
+                                    }}
+                                    onTouchEnd={handleTouchClick(() => deleteProject(project))}
+                                  >
+                                    <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
+                                  </button>
                                 <div className="w-6 h-6 rounded-md bg-muted/30 flex items-center justify-center">
                                   {isExpanded ? (
                                     <ChevronDown className="w-3 h-3 text-muted-foreground" />
@@ -1134,6 +1222,16 @@ function Sidebar({
                               title={t('tooltips.renameProject')}
                             >
                               <Edit3 className="w-3 h-3" />
+                            </div>
+                            <div
+                              className="w-6 h-6 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-accent flex items-center justify-center rounded cursor-pointer touch:opacity-100"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleArchiveProject(project.name);
+                              }}
+                              title={t('tooltips.archiveProject')}
+                            >
+                              <Archive className="w-3 h-3 text-muted-foreground" />
                             </div>
                             <div
                                 className="w-6 h-6 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center justify-center rounded cursor-pointer touch:opacity-100"
@@ -1514,10 +1612,19 @@ function Sidebar({
         </div>
       )}
       
-      {/* Settings Section */}
+      {/* Settings & Archive Section */}
       <div className="md:p-2 md:border-t md:border-border flex-shrink-0">
-        {/* Mobile Settings */}
-        <div className="md:hidden p-4 pb-20 border-t border-border/50">
+        {/* Mobile Settings & Archive */}
+        <div className="md:hidden p-4 pb-20 border-t border-border/50 space-y-2">
+          <button
+            className="w-full h-14 bg-muted/50 hover:bg-muted/70 rounded-2xl flex items-center justify-start gap-4 px-4 active:scale-[0.98] transition-all duration-150"
+            onClick={() => setShowArchiveModal(true)}
+          >
+            <div className="w-10 h-10 rounded-2xl bg-background/80 flex items-center justify-center">
+              <Archive className="w-5 h-5 text-muted-foreground" />
+            </div>
+            <span className="text-lg font-medium text-foreground">{t('archive.title')}</span>
+          </button>
           <button
             className="w-full h-14 bg-muted/50 hover:bg-muted/70 rounded-2xl flex items-center justify-start gap-4 px-4 active:scale-[0.98] transition-all duration-150"
             onClick={onShowSettings}
@@ -1528,16 +1635,27 @@ function Sidebar({
             <span className="text-lg font-medium text-foreground">{t('actions.settings')}</span>
           </button>
         </div>
-        
-        {/* Desktop Settings */}
-        <Button
-          variant="ghost"
-          className="hidden md:flex w-full justify-start gap-2 p-2 h-auto font-normal text-muted-foreground hover:text-foreground hover:bg-accent transition-colors duration-200"
-          onClick={onShowSettings}
-        >
-          <Settings className="w-3 h-3" />
-          <span className="text-xs">{t('actions.settings')}</span>
-        </Button>
+
+        {/* Desktop Settings & Archive */}
+        <div className="hidden md:flex gap-1">
+          <Button
+            variant="ghost"
+            className="flex-1 justify-start gap-2 p-2 h-auto font-normal text-muted-foreground hover:text-foreground hover:bg-accent transition-colors duration-200"
+            onClick={() => setShowArchiveModal(true)}
+            title={t('tooltips.openArchive')}
+          >
+            <Archive className="w-3 h-3" />
+            <span className="text-xs">{t('archive.title')}</span>
+          </Button>
+          <Button
+            variant="ghost"
+            className="flex-1 justify-start gap-2 p-2 h-auto font-normal text-muted-foreground hover:text-foreground hover:bg-accent transition-colors duration-200"
+            onClick={onShowSettings}
+          >
+            <Settings className="w-3 h-3" />
+            <span className="text-xs">{t('actions.settings')}</span>
+          </Button>
+        </div>
       </div>
     </div>
     </>

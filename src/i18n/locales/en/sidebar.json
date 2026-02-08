@@ -34,6 +34,17 @@
     "loading": "Loading...",
     "showMore": "Show more sessions"
   },
+  "archive": {
+    "title": "Archived Projects",
+    "archiveProject": "Archive",
+    "restoreProject": "Restore",
+    "deleteProject": "Delete permanently",
+    "noArchivedProjects": "No archived projects",
+    "noArchivedDescription": "Projects you archive will appear here",
+    "confirmDelete": "Permanently delete",
+    "restoreTooltip": "Restore to sidebar",
+    "deleteTooltip": "Delete permanently"
+  },
   "tooltips": {
     "viewEnvironments": "View Environments",
     "hideSidebar": "Hide sidebar",
@@ -45,6 +56,8 @@
     "removeFromFavorites": "Remove from favorites",
     "editSessionName": "Manually edit session name",
     "deleteSession": "Delete this session permanently",
+    "archiveProject": "Archive project",
+    "openArchive": "View archived projects",
     "save": "Save",
     "cancel": "Cancel"
   },

@@ -34,6 +34,17 @@
     "loading": "加载中...",
     "showMore": "显示更多会话"
   },
+  "archive": {
+    "title": "已归档项目",
+    "archiveProject": "归档",
+    "restoreProject": "恢复",
+    "deleteProject": "永久删除",
+    "noArchivedProjects": "没有已归档的项目",
+    "noArchivedDescription": "您归档的项目将显示在这里",
+    "confirmDelete": "永久删除",
+    "restoreTooltip": "恢复到侧边栏",
+    "deleteTooltip": "永久删除"
+  },
   "tooltips": {
     "viewEnvironments": "查看环境",
     "hideSidebar": "隐藏侧边栏",
@@ -45,6 +56,8 @@
     "removeFromFavorites": "从收藏移除",
     "editSessionName": "手动编辑会话名称",
     "deleteSession": "永久删除此会话",
+    "archiveProject": "归档项目",
+    "openArchive": "查看已归档项目",
     "save": "保存",
     "cancel": "取消"
   },
