@@ -1965,7 +1965,13 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, late
       if (savedMode) {
         setPermissionMode(savedMode);
       } else {
-        setPermissionMode('default');
+        // Fall back to the default permission mode from settings
+        try {
+          const claudeSettings = JSON.parse(localStorage.getItem('claude-settings') || '{}');
+          setPermissionMode(claudeSettings.defaultPermissionMode || 'default');
+        } catch {
+          setPermissionMode('default');
+        }
       }
     }
   }, [selectedSession?.id]);
