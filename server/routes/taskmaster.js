@@ -13,6 +13,7 @@ import fs from 'fs';
 import path from 'path';
 import { promises as fsPromises } from 'fs';
 import { spawn } from 'child_process';
+import { promiseAllLimit } from '../utils/concurrency.js';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import os from 'os';
@@ -354,7 +355,7 @@ router.get('/detect-all', async (req, res) => {
         const projects = await getProjects();
 
         // Run detection for all projects in parallel
-        const detectionPromises = projects.map(async (project) => {
+        const detectionTasks = projects.map((project) => async () => {
             try {
                 // Use the project's fullPath if available, otherwise extract the directory
                 let projectPath;
@@ -403,7 +404,7 @@ router.get('/detect-all', async (req, res) => {
             }
         });
 
-        const results = await Promise.all(detectionPromises);
+        const results = await promiseAllLimit(detectionTasks);
 
         res.json({
             projects: results,

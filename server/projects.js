@@ -65,6 +65,7 @@ import crypto from 'crypto';
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
 import os from 'os';
+import { promiseAllLimit } from './utils/concurrency.js';
 
 // Import TaskMaster detection functions
 async function detectTaskMasterFolder(projectPath) {
@@ -407,7 +408,7 @@ async function getProjects(progressCallback = null) {
     totalProjects = directories.length + manualProjectsCount;
 
     // Load all projects in parallel for faster boot
-    const projectPromises = directories.map(async (entry) => {
+    const projectTasks = directories.map((entry) => async () => {
         processedProjects++;
 
         // Emit progress
@@ -489,7 +490,7 @@ async function getProjects(progressCallback = null) {
       return project;
     });
 
-    projects.push(...await Promise.all(projectPromises));
+    projects.push(...await promiseAllLimit(projectTasks));
   } catch (error) {
     // If the directory doesn't exist (ENOENT), that's okay - just continue with empty projects
     if (error.code !== 'ENOENT') {
@@ -505,7 +506,7 @@ async function getProjects(progressCallback = null) {
   const manualEntries = Object.entries(config)
     .filter(([name, cfg]) => !existingProjects.has(name) && cfg.manuallyAdded);
 
-  const manualPromises = manualEntries.map(async ([projectName, projectConfig]) => {
+  const manualTasks = manualEntries.map(([projectName, projectConfig]) => async () => {
       processedProjects++;
 
       // Emit progress for manual projects
@@ -585,7 +586,7 @@ async function getProjects(progressCallback = null) {
       return project;
   });
 
-  projects.push(...await Promise.all(manualPromises));
+  projects.push(...await promiseAllLimit(manualTasks));
 
   // Emit completion after all projects (including manual) are processed
   if (progressCallback) {
@@ -613,8 +614,8 @@ async function getSessions(projectName, limit = 5, offset = 0) {
     }
     
     // Sort files by modification time (newest first)
-    const filesWithStats = await Promise.all(
-      jsonlFiles.map(async (file) => {
+    const filesWithStats = await promiseAllLimit(
+      jsonlFiles.map((file) => async () => {
         const filePath = path.join(projectDir, file);
         const stats = await fs.stat(filePath);
         return { file, mtime: stats.mtime };
