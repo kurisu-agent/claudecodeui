@@ -71,6 +71,8 @@ function AppContent() {
   const [autoScrollToBottom, setAutoScrollToBottom] = useLocalStorage('autoScrollToBottom', true);
   const [sendByCtrlEnter, setSendByCtrlEnter] = useLocalStorage('sendByCtrlEnter', false);
   const [sidebarVisible, setSidebarVisible] = useLocalStorage('sidebarVisible', true);
+  const [sidebarWidth, setSidebarWidth] = useLocalStorage('sidebarWidth', 320);
+  const [isResizing, setIsResizing] = useState(false);
   // Session Protection System: Track sessions with active conversations to prevent
   // automatic project updates from interrupting ongoing chats. When a user sends
   // a message, the session is marked as "active" and project updates are paused
@@ -437,6 +439,35 @@ function AppContent() {
 
 
 
+  const handleSidebarResize = useCallback((e) => {
+    const newWidth = Math.min(Math.max(e.clientX, 200), 600);
+    setSidebarWidth(newWidth);
+  }, [setSidebarWidth]);
+
+  const stopResizing = useCallback(() => {
+    setIsResizing(false);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }, []);
+
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener('mousemove', handleSidebarResize);
+      window.addEventListener('mouseup', stopResizing);
+      return () => {
+        window.removeEventListener('mousemove', handleSidebarResize);
+        window.removeEventListener('mouseup', stopResizing);
+      };
+    }
+  }, [isResizing, handleSidebarResize, stopResizing]);
+
+  const startResizing = useCallback((e) => {
+    e.preventDefault();
+    setIsResizing(true);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, []);
+
   const handleSidebarRefresh = async () => {
     // Refresh only the sessions for all projects, don't change selected state
     try {
@@ -761,11 +792,12 @@ function AppContent() {
       {/* Fixed Desktop Sidebar */}
       {!isMobile && (
         <div
-          className={`h-full flex-shrink-0 border-r border-border bg-card transition-all duration-300 ${
-            sidebarVisible ? 'w-80' : 'w-14'
-          }`}
+          className={`h-full flex-shrink-0 border-r border-border bg-card ${
+            sidebarVisible ? '' : 'w-14'
+          } ${isResizing ? '' : 'transition-all duration-300'}`}
+          style={sidebarVisible ? { width: sidebarWidth } : undefined}
         >
-          <div className="h-full overflow-hidden">
+          <div className="h-full overflow-hidden relative">
             {sidebarVisible ? (
               <Sidebar
                 projects={projects}
@@ -832,6 +864,13 @@ function AppContent() {
                   </button>
                 )}
               </div>
+            )}
+            {/* Resize Handle */}
+            {sidebarVisible && (
+              <div
+                onMouseDown={startResizing}
+                className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/30 active:bg-primary/50 transition-colors z-10"
+              />
             )}
           </div>
         </div>

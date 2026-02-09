@@ -35,7 +35,7 @@
     "showMore": "Show more sessions"
   },
   "archive": {
-    "title": "Archived Projects",
+    "title": "Archive",
     "archiveProject": "Archive",
     "restoreProject": "Restore",
     "deleteProject": "Delete permanently",

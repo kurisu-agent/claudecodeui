@@ -35,7 +35,7 @@
     "showMore": "显示更多会话"
   },
   "archive": {
-    "title": "已归档项目",
+    "title": "归档",
     "archiveProject": "归档",
     "restoreProject": "恢复",
     "deleteProject": "永久删除",

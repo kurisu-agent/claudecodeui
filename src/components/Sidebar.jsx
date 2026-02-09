@@ -1103,7 +1103,7 @@ function Sidebar({
                     <Button
                       variant="ghost"
                       className={cn(
-                        "hidden md:flex w-full justify-between p-2 h-auto font-normal hover:bg-accent/50",
+                        "hidden md:flex w-full justify-between p-2 h-auto font-normal hover:bg-accent/50 relative",
                         isSelected && "bg-accent text-accent-foreground",
                         isStarred && !isSelected && "bg-yellow-50/50 dark:bg-yellow-900/10 hover:bg-yellow-100/50 dark:hover:bg-yellow-900/20"
                       )}
@@ -1148,8 +1148,9 @@ function Sidebar({
                             </div>
                           ) : (
                             <div>
-                              <div className="text-sm font-semibold truncate text-foreground" title={project.displayName}>
+                              <div className="text-sm font-semibold truncate text-foreground flex items-center gap-1" title={project.displayName}>
                                 {project.displayName}
+                                {isStarred && <Star className="w-3 h-3 text-yellow-600 dark:text-yellow-400 fill-current flex-shrink-0" />}
                               </div>
                               <div className="text-xs text-muted-foreground">
                                 {(() => {
@@ -1168,9 +1169,10 @@ function Sidebar({
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-1 flex-shrink-0">
+                      {/* Chevron - always in flow */}
+                      <div className="flex-shrink-0 ml-1">
                         {editingProject === project.name ? (
-                          <>
+                          <div className="flex items-center gap-1">
                             <div
                               className="w-6 h-6 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20 flex items-center justify-center rounded cursor-pointer transition-colors"
                               onClick={(e) => {
@@ -1189,68 +1191,72 @@ function Sidebar({
                             >
                               <X className="w-3 h-3" />
                             </div>
-                          </>
+                          </div>
                         ) : (
-                          <>
-                            {/* Star button */}
-                            <div
-                              className={cn(
-                                "w-6 h-6 opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center rounded cursor-pointer touch:opacity-100",
-                                isStarred 
-                                  ? "hover:bg-yellow-50 dark:hover:bg-yellow-900/20 opacity-100" 
-                                  : "hover:bg-accent"
-                              )}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleStarProject(project.name);
-                              }}
-                              title={isStarred ? t('tooltips.removeFromFavorites') : t('tooltips.addToFavorites')}
-                            >
-                              <Star className={cn(
-                                "w-3 h-3 transition-colors",
-                                isStarred 
-                                  ? "text-yellow-600 dark:text-yellow-400 fill-current" 
-                                  : "text-muted-foreground"
-                              )} />
-                            </div>
-                            <div
-                              className="w-6 h-6 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-accent flex items-center justify-center rounded cursor-pointer touch:opacity-100"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                startEditing(project);
-                              }}
-                              title={t('tooltips.renameProject')}
-                            >
-                              <Edit3 className="w-3 h-3" />
-                            </div>
-                            <div
-                              className="w-6 h-6 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-accent flex items-center justify-center rounded cursor-pointer touch:opacity-100"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleArchiveProject(project.name);
-                              }}
-                              title={t('tooltips.archiveProject')}
-                            >
-                              <Archive className="w-3 h-3 text-muted-foreground" />
-                            </div>
-                            <div
-                                className="w-6 h-6 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center justify-center rounded cursor-pointer touch:opacity-100"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  deleteProject(project);
-                                }}
-                                title={t('tooltips.deleteProject')}
-                              >
-                                <Trash2 className="w-3 h-3 text-red-600 dark:text-red-400" />
-                              </div>
-                            {isExpanded ? (
-                              <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                            )}
-                          </>
+                          isExpanded ? (
+                            <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                          )
                         )}
                       </div>
+
+                      {/* Hover action buttons - absolutely positioned overlay */}
+                      {editingProject !== project.name && (
+                        <div className="absolute right-8 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-accent/90 rounded-md px-1 py-0.5 touch:opacity-100">
+                          {/* Star button */}
+                          <div
+                            className={cn(
+                              "w-6 h-6 flex items-center justify-center rounded cursor-pointer transition-colors",
+                              isStarred
+                                ? "hover:bg-yellow-50 dark:hover:bg-yellow-900/20"
+                                : "hover:bg-background/50"
+                            )}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleStarProject(project.name);
+                            }}
+                            title={isStarred ? t('tooltips.removeFromFavorites') : t('tooltips.addToFavorites')}
+                          >
+                            <Star className={cn(
+                              "w-3 h-3 transition-colors",
+                              isStarred
+                                ? "text-yellow-600 dark:text-yellow-400 fill-current"
+                                : "text-muted-foreground"
+                            )} />
+                          </div>
+                          <div
+                            className="w-6 h-6 hover:bg-background/50 flex items-center justify-center rounded cursor-pointer transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startEditing(project);
+                            }}
+                            title={t('tooltips.renameProject')}
+                          >
+                            <Edit3 className="w-3 h-3" />
+                          </div>
+                          <div
+                            className="w-6 h-6 hover:bg-background/50 flex items-center justify-center rounded cursor-pointer transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleArchiveProject(project.name);
+                            }}
+                            title={t('tooltips.archiveProject')}
+                          >
+                            <Archive className="w-3 h-3 text-muted-foreground" />
+                          </div>
+                          <div
+                            className="w-6 h-6 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center justify-center rounded cursor-pointer transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteProject(project);
+                            }}
+                            title={t('tooltips.deleteProject')}
+                          >
+                            <Trash2 className="w-3 h-3 text-red-600 dark:text-red-400" />
+                          </div>
+                        </div>
+                      )}
                     </Button>
                   </div>
 
