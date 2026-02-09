@@ -435,6 +435,8 @@ async function getProjects(progressCallback = null) {
           displayName: customName || autoDisplayName,
           fullPath: fullPath,
           isCustomName: !!customName,
+          starred: config[entry.name]?.starred || false,
+          archived: config[entry.name]?.archived || false,
           sessions: []
         };
 
@@ -537,6 +539,8 @@ async function getProjects(progressCallback = null) {
         fullPath: actualProjectDir,
         isCustomName: !!projectConfig.displayName,
         isManuallyAdded: true,
+        starred: projectConfig.starred || false,
+        archived: projectConfig.archived || false,
         sessions: [],
         cursorSessions: [],
         codexSessions: []
@@ -1671,6 +1675,14 @@ async function deleteCodexSession(sessionId) {
   }
 }
 
+// Set a flag (starred, archived) on a project in the config
+async function setProjectFlag(projectName, flag, value) {
+  const config = await loadProjectConfig();
+  if (!config[projectName]) config[projectName] = {};
+  config[projectName][flag] = value;
+  await saveProjectConfig(config);
+}
+
 export {
   getProjects,
   getSessions,
@@ -1687,5 +1699,6 @@ export {
   clearProjectDirectoryCache,
   getCodexSessions,
   getCodexSessionMessages,
-  deleteCodexSession
+  deleteCodexSession,
+  setProjectFlag
 };

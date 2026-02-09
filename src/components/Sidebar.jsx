@@ -54,6 +54,7 @@ function Sidebar({
   onNewSession,
   onSessionDelete,
   onProjectDelete,
+  onUpdateProjectFlag,
   isLoading,
   loadingProgress,
   onRefresh,
@@ -89,29 +90,6 @@ function Sidebar({
   // TaskMaster context
   const { setCurrentProject, mcpServerStatus } = useTaskMaster();
   const { tasksEnabled } = useTasksSettings();
-
-  
-  // Starred projects state - persisted in localStorage
-  const [starredProjects, setStarredProjects] = useState(() => {
-    try {
-      const saved = localStorage.getItem('starredProjects');
-      return saved ? new Set(JSON.parse(saved)) : new Set();
-    } catch (error) {
-      console.error('Error loading starred projects:', error);
-      return new Set();
-    }
-  });
-
-  // Archived projects state - persisted in localStorage
-  const [archivedProjects, setArchivedProjects] = useState(() => {
-    try {
-      const saved = localStorage.getItem('archivedProjects');
-      return saved ? new Set(JSON.parse(saved)) : new Set();
-    } catch (error) {
-      console.error('Error loading archived projects:', error);
-      return new Set();
-    }
-  });
 
   const [showArchiveModal, setShowArchiveModal] = useState(false);
 
@@ -218,47 +196,39 @@ function Sidebar({
     onSessionSelect({ ...session, __projectName: projectName });
   };
 
-  // Starred projects utility functions
-  const toggleStarProject = (projectName) => {
-    const newStarred = new Set(starredProjects);
-    if (newStarred.has(projectName)) {
-      newStarred.delete(projectName);
-    } else {
-      newStarred.add(projectName);
-    }
-    setStarredProjects(newStarred);
-    
-    // Persist to localStorage
-    try {
-      localStorage.setItem('starredProjects', JSON.stringify([...newStarred]));
-    } catch (error) {
-      console.error('Error saving starred projects:', error);
-    }
-  };
-
+  // Derive starred/archived from project data (backed by project-config.json via API)
   const isProjectStarred = (projectName) => {
-    return starredProjects.has(projectName);
-  };
-
-  // Archived projects utility functions
-  const toggleArchiveProject = (projectName) => {
-    const newArchived = new Set(archivedProjects);
-    if (newArchived.has(projectName)) {
-      newArchived.delete(projectName);
-    } else {
-      newArchived.add(projectName);
-    }
-    setArchivedProjects(newArchived);
-
-    try {
-      localStorage.setItem('archivedProjects', JSON.stringify([...newArchived]));
-    } catch (error) {
-      console.error('Error saving archived projects:', error);
-    }
+    return projects.find(p => p.name === projectName)?.starred || false;
   };
 
   const isProjectArchived = (projectName) => {
-    return archivedProjects.has(projectName);
+    return projects.find(p => p.name === projectName)?.archived || false;
+  };
+
+  // Optimistic toggle for star
+  const toggleStarProject = async (projectName) => {
+    const current = isProjectStarred(projectName);
+    const newValue = !current;
+    onUpdateProjectFlag(projectName, 'starred', newValue);
+    try {
+      await api.starProject(projectName, newValue);
+    } catch (error) {
+      onUpdateProjectFlag(projectName, 'starred', current);
+      console.error('Failed to update star status:', error);
+    }
+  };
+
+  // Optimistic toggle for archive
+  const toggleArchiveProject = async (projectName) => {
+    const current = isProjectArchived(projectName);
+    const newValue = !current;
+    onUpdateProjectFlag(projectName, 'archived', newValue);
+    try {
+      await api.archiveProject(projectName, newValue);
+    } catch (error) {
+      onUpdateProjectFlag(projectName, 'archived', current);
+      console.error('Failed to update archive status:', error);
+    }
   };
 
   const handleArchiveDelete = async (project) => {
@@ -266,15 +236,6 @@ function Sidebar({
       const sessionCount = getAllSessions(project).length;
       const response = await api.deleteProject(project.name, sessionCount > 0);
       if (response.ok) {
-        // Remove from archived set
-        const newArchived = new Set(archivedProjects);
-        newArchived.delete(project.name);
-        setArchivedProjects(newArchived);
-        try {
-          localStorage.setItem('archivedProjects', JSON.stringify([...newArchived]));
-        } catch (error) {
-          console.error('Error saving archived projects:', error);
-        }
         if (onProjectDelete) {
           onProjectDelete(project.name);
         }
@@ -581,7 +542,7 @@ function Sidebar({
       {showArchiveModal && (
         <ArchiveModal
           projects={projects}
-          archivedProjects={archivedProjects}
+          archivedProjects={new Set(projects.filter(p => p.archived).map(p => p.name))}
           onRestore={(projectName) => toggleArchiveProject(projectName)}
           onDelete={(project) => handleArchiveDelete(project)}
           onClose={() => setShowArchiveModal(false)}

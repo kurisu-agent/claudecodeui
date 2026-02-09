@@ -516,6 +516,13 @@ function AppContent() {
     }
   };
 
+  // Optimistic state updater for project flags (starred/archived)
+  const handleUpdateProjectFlag = useCallback((projectName, flag, value) => {
+    setProjects(prev => prev.map(p =>
+      p.name === projectName ? { ...p, [flag]: value } : p
+    ));
+  }, []);
+
   const handleProjectDelete = (projectName) => {
     // If the deleted project was currently selected, clear it
     if (selectedProject?.name === projectName) {
@@ -808,6 +815,7 @@ function AppContent() {
                 onNewSession={handleNewSession}
                 onSessionDelete={handleSessionDelete}
                 onProjectDelete={handleProjectDelete}
+                onUpdateProjectFlag={handleUpdateProjectFlag}
                 isLoading={isLoadingProjects}
                 loadingProgress={loadingProgress}
                 onRefresh={handleSidebarRefresh}
@@ -910,6 +918,7 @@ function AppContent() {
               onNewSession={handleNewSession}
               onSessionDelete={handleSessionDelete}
               onProjectDelete={handleProjectDelete}
+              onUpdateProjectFlag={handleUpdateProjectFlag}
               isLoading={isLoadingProjects}
               loadingProgress={loadingProgress}
               onRefresh={handleSidebarRefresh}

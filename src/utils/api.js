@@ -84,6 +84,16 @@ export const api = {
     authenticatedFetch(`/api/projects/${projectName}${force ? '?force=true' : ''}`, {
       method: 'DELETE',
     }),
+  starProject: (projectName, starred) =>
+    authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/star`, {
+      method: 'PATCH',
+      body: JSON.stringify({ starred }),
+    }),
+  archiveProject: (projectName, archived) =>
+    authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/archive`, {
+      method: 'PATCH',
+      body: JSON.stringify({ archived }),
+    }),
   createProject: (path) =>
     authenticatedFetch('/api/projects/create', {
       method: 'POST',

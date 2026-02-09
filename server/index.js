@@ -42,7 +42,7 @@ import pty from 'node-pty';
 import fetch from 'node-fetch';
 import mime from 'mime-types';
 
-import { getProjects, getSessions, getSessionMessages, renameProject, deleteSession, deleteProject, addProjectManually, extractProjectDirectory, clearProjectDirectoryCache } from './projects.js';
+import { getProjects, getSessions, getSessionMessages, renameProject, deleteSession, deleteProject, addProjectManually, extractProjectDirectory, clearProjectDirectoryCache, setProjectFlag } from './projects.js';
 import { queryClaudeSDK, abortClaudeSDKSession, isClaudeSDKSessionActive, getActiveClaudeSDKSessions, resolveToolApproval } from './claude-sdk.js';
 import { spawnCursor, abortCursorSession, isCursorSessionActive, getActiveCursorSessions } from './cursor-cli.js';
 import { queryCodex, abortCodexSession, isCodexSessionActive, getActiveCodexSessions } from './openai-codex.js';
@@ -421,6 +421,28 @@ app.put('/api/projects/:projectName/rename', authenticateToken, async (req, res)
     try {
         const { displayName } = req.body;
         await renameProject(req.params.projectName, displayName);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Star project endpoint
+app.patch('/api/projects/:projectName/star', authenticateToken, async (req, res) => {
+    try {
+        const { starred } = req.body;
+        await setProjectFlag(req.params.projectName, 'starred', !!starred);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Archive project endpoint
+app.patch('/api/projects/:projectName/archive', authenticateToken, async (req, res) => {
+    try {
+        const { archived } = req.body;
+        await setProjectFlag(req.params.projectName, 'archived', !!archived);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
