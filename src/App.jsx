@@ -287,8 +287,8 @@ function AppContent() {
       const response = await api.projects();
       const data = await response.json();
       
-      // Always fetch Cursor sessions for each project so we can combine views
-      for (let project of data) {
+      // Fetch Cursor sessions for all projects in parallel
+      await Promise.all(data.map(async (project) => {
         try {
           const url = `/api/cursor/sessions?projectPath=${encodeURIComponent(project.fullPath || project.path)}`;
           const cursorResponse = await authenticatedFetch(url);
@@ -306,7 +306,7 @@ function AppContent() {
           console.error(`Error fetching Cursor sessions for project ${project.name}:`, error);
           project.cursorSessions = [];
         }
-      }
+      }));
       
       // Optimize to preserve object references when data hasn't changed
       setProjects(prevProjects => {
